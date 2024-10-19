@@ -1,8 +1,8 @@
 {
   lib,
-  mkYarnPackage,
+  pnpm_9,
+  stdenv,
   fetchFromGitHub,
-  fetchYarnDeps,
   makeWrapper,
   node-pre-gyp,
   nodejs,
@@ -10,64 +10,55 @@
   sqlite,
 }:
 
-mkYarnPackage rec {
+let
+  pnpm = pnpm_9;
+in
+stdenv.mkDerivation (finalAttrs: {
   pname = "jellyseerr";
-  version = "1.9.2";
+  version = "2.0.1";
 
   src = fetchFromGitHub {
     owner = "Fallenbagel";
     repo = "jellyseerr";
-    rev = "v${version}";
-    hash = "sha256-TXe/k/pb7idu7G1wGu6TZksnoFQ5/PN0voVlve3k1UI=";
+    rev = "v${finalAttrs.version}";
+    hash = "sha256-ZqHm8GeougFGfOeHXit2+2dRMeQrGgt3kFlm7pUxWpg=";
   };
 
-  packageJSON = ./package.json;
-
-  offlineCache = fetchYarnDeps {
-    yarnLock = "${src}/yarn.lock";
-    hash = "sha256-2iRxguxEI+YKm8ddhRgZMvfZuUgQmCK5ER4jMCFJQMQ=";
+  pnpmDeps = pnpm.fetchDeps {
+    inherit (finalAttrs)
+      pname
+      version
+      src
+      ;
+    hash = "sha256-L0oV4DqjrLubPFnOp4YxnRq+QyJFcbyv3Xpw7rBJ3ms=";
   };
 
   nativeBuildInputs = [
     nodejs
     makeWrapper
+    pnpm.configHook
+    node-pre-gyp
+    sqlite
+    python3
   ];
 
-  # Fixes "SQLite package has not been found installed" at launch
-  pkgConfig.sqlite3 = {
-    nativeBuildInputs = [
-      node-pre-gyp
-      python3
-      sqlite
-    ];
-    postInstall = ''
-      export CPPFLAGS="-I${nodejs}/include/node"
-      node-pre-gyp install --prefer-offline --build-from-source --nodedir=${nodejs}/include/node --sqlite=${sqlite.dev}
-      rm -r build-tmp-napi-v6
-    '';
-  };
-
-  pkgConfig.bcrypt = {
-    nativeBuildInputs = [
-      node-pre-gyp
-      python3
-    ];
-    postInstall = ''
-      export CPPFLAGS="-I${nodejs}/include/node"
-      node-pre-gyp install --prefer-offline --build-from-source --nodedir=${nodejs}/include/node
-    '';
+  pnpmInstallFlags = "--frozen-lockfile";
+  env = {
+    CYPRESS_INSTALL_BINARY = "0";
   };
 
   buildPhase = ''
     runHook preBuild
-    (
-      shopt -s dotglob
-      cd deps/jellyseerr
-      rm -r config/*
-      yarn build
-      rm -r .next/cache
-    )
+
+    pnpm build
+
     runHook postBuild
+  '';
+
+  preInstall = ''
+    mkdir -p $out/libexec/jellyseerr/deps/jellyseerr/config
+    cp -R ./dist $out/libexec/jellyseerr/deps/jellyseerr
+    cp -R ./node_modules $out/libexec/jellyseerr/deps/jellyseerr
   '';
 
   postInstall = ''
@@ -75,8 +66,6 @@ mkYarnPackage rec {
       --add-flags "$out/libexec/jellyseerr/deps/jellyseerr/dist/index.js" \
       --set NODE_ENV production
   '';
-
-  doDist = false;
 
   passthru.updateScript = ./update.sh;
 
@@ -93,4 +82,4 @@ mkYarnPackage rec {
     platforms = platforms.linux;
     mainProgram = "jellyseerr";
   };
-}
+})
