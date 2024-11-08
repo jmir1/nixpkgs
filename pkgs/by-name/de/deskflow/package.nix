@@ -24,16 +24,21 @@
   qt6,
   xkeyboard_config,
   openssl,
+  wayland-protocols,
+  wayland,
+  libsysprof-capture,
+  lerc,
+  doxygen,
 }:
-stdenv.mkDerivation {
+stdenv.mkDerivation rec {
   pname = "deskflow";
-  version = "1.17.0.169";
+  version = "1.17.1";
 
   src = fetchFromGitHub {
     owner = "deskflow";
     repo = "deskflow";
-    rev = "16a1ba8f4543a63eae532995297eb02ae88344e5";
-    hash = "sha256-ld7RgzEZ7n8UK1RL4boMa4HyU5aF4jwDTUrwNOXGLNk=";
+    rev = "v${version}";
+    hash = "sha256-cEKG9MwENbZqrfRdwiZtRWmIfRndrWUoaZQ5O7YRpBs=";
   };
 
   postPatch = ''
@@ -46,6 +51,7 @@ stdenv.mkDerivation {
     ninja
     pkg-config
     qt6.wrapQtAppsHook
+    doxygen # docs
   ];
 
   cmakeFlags = [
@@ -72,6 +78,11 @@ stdenv.mkDerivation {
     libnotify
     python3
     qt6.qtbase
+    wayland-protocols
+    qt6.qtwayland
+    wayland
+    libsysprof-capture
+    lerc
   ];
 
   postInstall = ''
@@ -79,6 +90,10 @@ stdenv.mkDerivation {
         --replace-fail "Path=/usr/bin" "Path=$out/bin" \
         --replace-fail "Exec=/usr/bin/deskflow" "Exec=deskflow"
   '';
+
+  qtWrapperArgs = [
+    "--set QT_QPA_PLATFORM_PLUGIN_PATH ${qt6.qtwayland}/${qt6.qtbase.qtPluginPrefix}/platforms"
+  ];
 
   meta = {
     homepage = "https://github.com/deskflow/deskflow";
